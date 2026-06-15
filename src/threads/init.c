@@ -40,6 +40,8 @@
 #include "filesys/fsutil.h"
 #endif
 
+#include "threads/shell.h"
+
 /** Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
 
@@ -134,6 +136,7 @@ int pintos_init(void) {
     run_actions(argv);
   } else {
     // TODO: no command line passed to kernel. Run interactively
+    start_shell();
   }
 
   /* Finish up. */
