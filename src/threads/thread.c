@@ -299,7 +299,9 @@ void thread_foreach(thread_action_func *func, void *aux) {
 
 /** Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
-  thread_current()->priority = new_priority;
+  struct thread *cur = thread_current();
+  cur->base_priority = new_priority;
+  reculc_priority(cur, 8);
 }
 
 /** Returns the current thread's priority. */
@@ -400,7 +402,9 @@ static void init_thread(struct thread *t, const char *name, int priority) {
   t->status = THREAD_BLOCKED;
   strlcpy(t->name, name, sizeof t->name);
   t->stack = (uint8_t *)t + PGSIZE;
-  t->priority = priority;
+  t->priority = t->base_priority = priority;
+  list_init(&t->locks);
+  t->waiting_lock = NULL;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
@@ -510,6 +514,20 @@ bool thread_less(const struct list_elem *a, const struct list_elem *b, void *aux
   struct thread *tha = list_entry(a, struct thread, elem);
   struct thread *thb = list_entry(b, struct thread, elem);
   return tha->priority < thb->priority;
+}
+
+void reculc_priority(struct thread *thread, int max_depth){
+  if(max_depth < 0) return;
+
+  thread->priority = thread->base_priority;
+  for(struct list_elem *e = list_begin(&thread->locks); e != list_end(&thread->locks); e = list_next(e)){
+    struct lock *lock = list_entry(e, struct lock, elem);
+    if (list_empty(&lock->semaphore.waiters)) continue;
+
+    struct thread *waiter = list_entry(list_back(&lock->semaphore.waiters), struct thread, elem);
+    reculc_priority(waiter, max_depth - 1);
+    thread->priority = thread->priority > waiter->priority ? thread->priority : waiter->priority;
+  }
 }
 
 /** Offset of `stack' member within `struct thread'.
