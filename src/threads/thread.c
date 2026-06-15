@@ -300,8 +300,15 @@ void thread_foreach(thread_action_func *func, void *aux) {
 /** Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
   struct thread *cur = thread_current();
+  struct thread *next = NULL;
+
   cur->base_priority = new_priority;
   reculc_priority(cur, 8);
+
+  if (!list_empty(&ready_list)) {
+    next = list_entry(list_max(&ready_list, thread_less, NULL), struct thread, elem);
+    if (next->priority > cur->priority) thread_yield();
+  }
 }
 
 /** Returns the current thread's priority. */
