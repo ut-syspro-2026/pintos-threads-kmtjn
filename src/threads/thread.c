@@ -188,6 +188,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 
   /* Add to run queue. */
   thread_unblock(t);
+  if(priority > thread_current()->priority) thread_yield();
 
   return tid;
 }
@@ -221,7 +222,7 @@ void thread_unblock(struct thread *t) {
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  list_push_back(&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, thread_less, NULL);
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
@@ -277,7 +278,7 @@ void thread_yield(void) {
   ASSERT(!intr_context());
 
   old_level = intr_disable();
-  if (cur != idle_thread) list_push_back(&ready_list, &cur->elem);
+  if (cur != idle_thread) list_insert_ordered(&ready_list, &cur->elem, thread_less, NULL);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
@@ -427,7 +428,7 @@ static struct thread *next_thread_to_run(void) {
   if (list_empty(&ready_list))
     return idle_thread;
   else
-    return list_entry(list_pop_front(&ready_list), struct thread, elem);
+    return list_entry(list_pop_back(&ready_list), struct thread, elem);
 }
 
 /** Completes a thread switch by activating the new thread's page
@@ -503,6 +504,12 @@ static tid_t allocate_tid(void) {
   lock_release(&tid_lock);
 
   return tid;
+}
+
+bool thread_less(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+  struct thread *tha = list_entry(a, struct thread, elem);
+  struct thread *thb = list_entry(b, struct thread, elem);
+  return tha->priority < thb->priority;
 }
 
 /** Offset of `stack' member within `struct thread'.

@@ -97,6 +97,9 @@ static bool sleeper_less(
 /** Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void timer_sleep(int64_t ticks) {
+  if(ticks <= 0)
+   return;
+   
   int64_t start = timer_ticks();
 
   ASSERT(intr_get_level() == INTR_ON);
@@ -172,6 +175,7 @@ static void timer_interrupt(struct intr_frame *args UNUSED) {
    if(sl->wake_tick > ticks)
       break;
    thread_unblock(sl->thread);
+   if(sl->thread->priority > thread_current()->priority)intr_yield_on_return();
   }
 }
 
